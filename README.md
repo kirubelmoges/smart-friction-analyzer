@@ -294,8 +294,6 @@ Dashboard update rate is 2 Hz for measurements and 0.5 Hz for live angle.
 License
 This project is open source. You can use it, modify it, and build on it. Just give credit where it is due.
 
-Contact
-For questions or support email kirubelmoges@example.com
 
 Document Version 1.0
 Last Updated May 2026
