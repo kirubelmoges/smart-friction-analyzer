@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slider-Crank Mechanism - Interactive Animation</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            color: white;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255,255,255,0.1);
+            border-radius: 20px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #ddd;
+            margin-bottom: 30px;
+        }
+        .animation-area {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+        canvas {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: scale(1.05);
+        }
+        .play { background: #4CAF50; color: white; }
+        .pause { background: #f44336; color: white; }
+        .reset { background: #FF9800; color: white; }
+        .speed { background: #2196F3; color: white; }
+        .data-panel {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+            padding: 20px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+        }
+        .data-card {
+            text-align: center;
+            padding: 10px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+        }
+        .data-card h3 {
+            margin: 0 0 5px 0;
+            font-size: 14px;
+            opacity: 0.8;
+        }
+        .data-card .value {
+            font-size: 24px;
+            font-weight: bold;
+            font-family: monospace;
+        }
+        input {
+            padding: 8px;
+            margin: 0 5px;
+            border-radius: 5px;
+            border: none;
+        }
+        label {
+            margin: 0 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚙️ Slider-Crank Mechanism</h1>
+        <div class="subtitle">Interactive Kinematic Simulation</div>
+        
+        <div class="animation-area">
+            <canvas id="mechanismCanvas" width="800" height="400"></canvas>
+        </div>
+        
+        <div class="controls">
+            <button class="play" onclick="animation.play()">▶ Play</button>
+            <button class="pause" onclick="animation.pause()">⏸ Pause</button>
+            <button class="reset" onclick="animation.reset()">🔄 Reset</button>
+            <div>
+                <label>Speed:</label>
+                <input type="range" id="speedSlider" min="0" max="2" step="0.05" value="1">
+                <span id="speedValue">1.0x</span>
+            </div>
+        </div>
+        
+        <div class="data-panel">
+            <div class="data-card">
+                <h3>Crank Angle</h3>
+                <div class="value" id="angleValue">0°</div>
+            </div>
+            <div class="data-card">
+                <h3>Slider Position</h3>
+                <div class="value" id="positionValue">0.00 m</div>
+            </div>
+            <div class="data-card">
+                <h3>Slider Velocity</h3>
+                <div class="value" id="velocityValue">0.00 m/s</div>
+            </div>
+            <div class="data-card">
+                <h3>Slider Acceleration</h3>
+                <div class="value" id="accelValue">0.00 m/s²</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Mechanism parameters
+        const crankLength = 100;      // pixels (1m = 100px)
+        const rodLength = 300;        // pixels (3m = 300px)
+        const crankRadius = crankLength;
+        
+        // Animation state
+        let angle = 0;                // radians
+        let angularVelocity = 2 * Math.PI; // rad/s (1 rev/sec)
+        let lastTimestamp = 0;
+        let running = true;
+        let animationId = null;
+        
+        // Canvas elements
+        const canvas = document.getElementById('mechanismCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Fixed pivot point (crank center)
+        const centerX = 200;
+        const centerY = 200;
+        
+        function computeKinematics(angleRad) {
+            // Crank end point
+            const crankX = centerX + crankRadius * Math.cos(angleRad);
+            const crankY = centerY + crankRadius * Math.sin(angleRad);
+            
+            // Slider position (x coordinate) - solving slider-crank equation
+            // x_slider = crank_x + sqrt(rod² - crank_y²)
+            const dy = crankY - centerY;
+            const dx = Math.sqrt(Math.max(0, rodLength * rodLength - dy * dy));
+            const sliderX = crankX + dx;
+            const sliderY = centerY;
+            
+            // Compute velocity and acceleration analytically
+            const omega = angularVelocity;
+            const theta = angleRad;
+            const r = crankRadius;
+            const l = rodLength;
+            
+            // Position formula: x = r*cosθ + √(l² - r²*sin²θ)
+            const sinTheta = Math.sin(theta);
+            const cosTheta = Math.cos(theta);
+            const term = l * l - r * r * sinTheta * sinTheta;
+            const sqrtTerm = Math.sqrt(Math.max(0.01, term));
+            const position = r * cosTheta + sqrtTerm;
+            
+            // Velocity: dx/dt = -r*ω*sinθ - (r²*ω*sinθ*cosθ)/√(l² - r²*sin²θ)
+            const velocityNumerator = -r * r * omega * sinTheta * cosTheta;
+            const velocity = -r * omega * sinTheta + velocityNumerator / sqrtTerm;
+            
+            // Acceleration (simplified for display)
+            const acceleration = -r * omega * omega * cosTheta;
+            
+            return {
+                crankX, crankY,
+                sliderX, sliderY,
+                position: position / 100,  // convert to meters
+                velocity: velocity / 100,  // m/s
+                acceleration: acceleration / 100,  // m/s²
+                angleDeg: (theta * 180 / Math.PI) % 360
+            };
+        }
+        
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw background grid
+            ctx.strokeStyle = '#ddd';
+            ctx.lineWidth = 0.5;
+            for (let x = 0; x < canvas.width; x += 50) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += 50) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+            
+            const kin = computeKinematics(angle);
+            
+            // Draw slider guide (horizontal line)
+            ctx.beginPath();
+            ctx.moveTo(centerX + crankRadius + 50, centerY);
+            ctx.lineTo(canvas.width - 50, centerY);
+            ctx.strokeStyle = '#666';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Draw crank (red)
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(kin.crankX, kin.crankY);
+            ctx.strokeStyle = '#e74c3c';
+            ctx.lineWidth = 4;
+            ctx.stroke();
+            
+            // Draw crank circle (path)
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, crankRadius, 0, 2 * Math.PI);
+            ctx.strokeStyle = '#e74c3c';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([5, 5]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // Draw connecting rod (blue)
+            ctx.beginPath();
+            ctx.moveTo(kin.crankX, kin.crankY);
+            ctx.lineTo(kin.sliderX, kin.sliderY);
+            ctx.strokeStyle = '#3498db';
+            ctx.lineWidth = 4;
+            ctx.stroke();
+            
+            // Draw pivot points
+            ctx.fillStyle = '#2c3e50';
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, 8, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.fillStyle = '#e74c3c';
+            ctx.beginPath();
+            ctx.arc(kin.crankX, kin.crankY, 6, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            // Draw slider (piston)
+            ctx.fillStyle = '#27ae60';
+            ctx.fillRect(kin.sliderX - 12, kin.sliderY - 12, 24, 24);
+            ctx.fillStyle = '#2ecc71';
+            ctx.beginPath();
+            ctx.arc(kin.sliderX, kin.sliderY, 6, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            // Draw labels
+            ctx.fillStyle = '#333';
+            ctx.font = 'bold 12px Arial';
+            ctx.fillText('Crank Center', centerX - 40, centerY - 10);
+            ctx.fillText('Crank', (centerX + kin.crankX) / 2 + 10, (centerY + kin.crankY) / 2);
+            ctx.fillText('Connecting Rod', (kin.crankX + kin.sliderX) / 2, (kin.crankY + kin.sliderY) / 2 - 10);
+            ctx.fillText('Slider/Piston', kin.sliderX + 15, kin.sliderY);
+            
+            // Update data panel
+            document.getElementById('angleValue').innerHTML = kin.angleDeg.toFixed(1) + '°';
+            document.getElementById('positionValue').innerHTML = kin.position.toFixed(3) + ' m';
+            document.getElementById('velocityValue').innerHTML = kin.velocity.toFixed(2) + ' m/s';
+            document.getElementById('accelValue').innerHTML = kin.acceleration.toFixed(2) + ' m/s²';
+        }
+        
+        function update(deltaTime) {
+            if (!running) return;
+            
+            const speed = parseFloat(document.getElementById('speedSlider').value);
+            document.getElementById('speedValue').innerHTML = speed.toFixed(2) + 'x';
+            
+            // Update angle
+            angle += angularVelocity * deltaTime * speed;
+            angle = angle % (2 * Math.PI);
+            
+            draw();
+        }
+        
+        let lastTime = 0;
+        function animate(currentTime) {
+            requestAnimationFrame(animate);
+            if (lastTime === 0) {
+                lastTime = currentTime;
+                return;
+            }
+            const delta = Math.min(0.033, (currentTime - lastTime) / 1000);
+            if (delta > 0.001) {
+                update(delta);
+            }
+            lastTime = currentTime;
+        }
+        
+        const animation = {
+            play: () => { running = true; },
+            pause: () => { running = false; },
+            reset: () => { angle = 0; draw(); }
+        };
+        
+        // Initialize
+        draw();
+        requestAnimationFrame(animate);
+        
+        // Add resize handling
+        window.addEventListener('resize', () => draw());
+    </script>
+</body>
+</html>
