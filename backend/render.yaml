@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: static-friction-analyzer
+    runtime: python
+    repo: https://github.com/kirubelmoges/static-friction-analyzer
+    plan: free
+    region: frankfurt  # Choose closest to you: frankfurt, oregon, singapore, ohio
+    buildCommand: |
+      pip install -r requirements.txt
+      python manage.py collectstatic --noinput
+    startCommand: gunicorn friction_backend.wsgi:application --bind 0.0.0.0:$PORT
+    envVars:
+      - key: RENDER
+        value: True
+      - key: PYTHON_VERSION
+        value: 3.10.0
+      - key: DATABASE_URL
+        fromDatabase:
+          name: friction-mysql
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: False
+      - key: ALLOWED_HOSTS
+        value: static-friction-analyzer.onrender.com,localhost,127.0.0.1
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://static-friction-analyzer-frontend.vercel.app,http://localhost:3000
+      - key: WEB_CONCURRENCY
+        value: 1
+
+  # Optional: Database service (if you want Render PostgreSQL instead of Aiven)
+  # - type: postgresql
+  #   name: friction-mysql
+  #   plan: free
+  #   ipAllowList: []  # Allow only internal connections

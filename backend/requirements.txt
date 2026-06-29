@@ -1,0 +1,17 @@
+﻿# Core Django
+Django==4.2.7
+djangorestframework==3.14.0
+django-cors-headers==4.3.1
+
+# Database - MySQL with SSL support
+mysqlclient==2.2.0
+
+# Production Server
+gunicorn==21.2.0
+whitenoise==6.5.0
+
+# Environment
+python-dotenv==1.0.0
+
+# Database URL parser
+dj-database-url==2.1.0
